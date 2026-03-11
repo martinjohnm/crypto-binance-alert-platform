@@ -1,1 +1,1 @@
-Crypto alert platform
+# Crypto alert platform in rust
