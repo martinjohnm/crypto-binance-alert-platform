@@ -1,13 +1,18 @@
+mod market_manager;
+mod alert_manager;
+
 use serde_json::Value;
 use tokio_tungstenite::connect_async;
 use futures_util::StreamExt;
 use serde::Deserialize;
 
+use crate::market_manager::MarketManager;
+
 #[derive(Debug, Deserialize)]
 struct Trade {
     s: String,  // symbol
     p: String,  // price
-    q: Option<String>, // quantity
+    _q: Option<String>, // quantity
 }
 
 #[derive(Debug, Deserialize)]
@@ -21,11 +26,13 @@ struct BookTicker {
 
 #[tokio::main]
 async fn main() {
-    let url = "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@bookTicker";
+    let url = "wss://stream.binance.com:9443/stream?streams=btcusdt@trade";
 
     let (ws_stream, _) = connect_async(url).await.expect("Failed to connect");
 
     let (_, mut read) = ws_stream.split();
+
+    let manager = MarketManager::new();
 
     while let Some(msg) = read.next().await {
         let msg = match msg {
@@ -59,7 +66,9 @@ async fn main() {
         match stream_name.split('@').nth(1).unwrap_or("") {
             "trade" => {
                 if let Ok(trade) = serde_json::from_value::<Trade>(data.clone()) {
-                    println!("TRADE: {} price {}", trade.s, trade.p);
+                    let price : f64 = trade.p.parse().unwrap();
+                    manager.update_price(&trade.s, price);
+                    println!("{:?}",manager );
                 }
             }
             "bookTicker" => {
