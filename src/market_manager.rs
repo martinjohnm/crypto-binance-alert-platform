@@ -19,4 +19,8 @@ impl MarketManager {
     pub fn update_price(&self, symbol : &str, price : f64) {
         self.markets.borrow_mut().insert(symbol.to_string(), MarketState { price });
     }
+
+    pub fn len(&self) -> usize {
+        self.markets.borrow().len()
+    }
 }
