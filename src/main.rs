@@ -34,11 +34,42 @@ pub enum BinanceData {
     BookTicker(BookTicker),
 }
 
+use reqwest;
 
+#[derive(Deserialize)]
+struct BinanceInfo {
+    symbols: Vec<Symbol>,
+}
+
+#[derive(Deserialize)]
+struct Symbol {
+    symbol: String,
+    status: String,
+    #[serde(rename = "quoteAsset")]
+    quote_asset: String,
+}
+
+async fn get_200_streams_url() -> String {
+    let resp = reqwest::get("https://api.binance.com/api/v3/exchangeInfo")
+        .await.unwrap()
+        .json::<BinanceInfo>()
+        .await.unwrap();
+
+    // Filter for USDT pairs that are currently trading
+    let streams: Vec<String> = resp.symbols.into_iter()
+        .filter(|s| s.quote_asset == "USDT" && s.status == "TRADING")
+        .take(200) // Get exactly 200
+        .map(|s| format!("{}@trade", s.symbol.to_lowercase()))
+        .collect();
+
+    format!("wss://stream.binance.com:9443/stream?streams={}", streams.join("/"))
+}
 
 #[tokio::main]
 async fn main() {
-    let url = "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/solusdt@trade/bnbusdt@trade/adausdt@trade/xrpusdt@trade/dotusdt@trade/dogeusdt@trade/avaxusdt@trade/shibusdt@trade/maticusdt@trade/ltcusdt@trade/nearusdt@trade/ftmusdt@trade/atomusdt@trade/linkusdt@trade/trxusdt@trade/uniusdt@trade/bchusdt@trade/axsusdt@trade";
+    // let url = "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/solusdt@trade/bnbusdt@trade/adausdt@trade/xrpusdt@trade/dotusdt@trade/dogeusdt@trade/avaxusdt@trade/shibusdt@trade/maticusdt@trade/ltcusdt@trade/nearusdt@trade/ftmusdt@trade/atomusdt@trade/linkusdt@trade/trxusdt@trade/uniusdt@trade/bchusdt@trade/axsusdt@trade";
+    // let url = "wss://stream.binance.com:9443/stream?streams=solusdt@trade";
+    let url = get_200_streams_url().await;
     let (ws_stream, _) = connect_async(url).await.expect("Failed to connect");
 
     let (_, mut read) = ws_stream.split();
@@ -76,7 +107,7 @@ async fn main() {
             }
         }
 
-        println!("{:?}", manager)
+        // println!("{:?}", manager.len())
         // // Parse the JSON dynamically
         // let parsed: Value = match serde_json::from_str(&msg_text) {
         //     Ok(p) => p,
